@@ -1,39 +1,51 @@
 import { useState, useEffect, useRef } from 'react';
 import './App.css';
 
+// --- TYPES ---
+type SessionStats = {
+  wpm: number;
+  accuracy: number;
+  failedLines: string[];
+};
+
 // --- PRACTICE SESSION COMPONENT ---
-function PracticeSession({ lines, onExit }: { lines: string[], onExit: () => void }) {
-  // Settings
+function PracticeSession({ 
+  lines, 
+  onExit, 
+  onComplete 
+}: { 
+  lines: string[], 
+  onExit: () => void, 
+  onComplete: (stats: SessionStats) => void 
+}) {
   const [isLowerCase, setIsLowerCase] = useState(false);
-  const [removePunctuation, setRemovePunctuation] = useState(false); // <-- New State
+  const [removePunctuation, setRemovePunctuation] = useState(false);
   const [showWPM, setShowWPM] = useState(true);
   const [showAccuracy, setShowAccuracy] = useState(true);
 
-  // Typing State
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
   const [userInput, setUserInput] = useState('');
   
-  // Metrics State
   const [startTime, setStartTime] = useState<number | null>(null);
   const [correctKeystrokes, setCorrectKeystrokes] = useState(0);
   const [totalKeystrokes, setTotalKeystrokes] = useState(0);
+  
+  // Track errors on the current line specifically
+  const [currentLineErrors, setCurrentLineErrors] = useState(0);
+  // Keep a running list of lines the user struggled with
+  const [failedLines, setFailedLines] = useState<string[]>([]);
 
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // The line the user is currently trying to type
   let targetLine = lines[currentLineIndex] || "";
   
   if (removePunctuation) {
-    // Removes all punctuation (including apostrophes, so "don't" becomes "dont")
-    // and collapses any double spaces created by removing things like em-dashes.
     targetLine = targetLine.replace(/[^\w\s]/g, "").replace(/\s+/g, " ");
   }
-  
   if (isLowerCase) {
     targetLine = targetLine.toLowerCase();
   }
 
-  // Focus the hidden input automatically
   useEffect(() => {
     inputRef.current?.focus();
   }, [currentLineIndex]);
@@ -41,58 +53,68 @@ function PracticeSession({ lines, onExit }: { lines: string[], onExit: () => voi
   const handleTyping = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     
-    // Start the timer on the first keystroke
     if (!startTime) setStartTime(Date.now());
 
     setUserInput(value);
 
-    // Calculate accuracy metrics
+    // Calculate metrics
     setTotalKeystrokes(prev => prev + 1);
     const lastTypedChar = value[value.length - 1];
     const targetChar = targetLine[value.length - 1];
     
     if (lastTypedChar === targetChar) {
       setCorrectKeystrokes(prev => prev + 1);
+    } else if (value.length <= targetLine.length) {
+      // If they typed a wrong character (and aren't just backspacing), add an error
+      setCurrentLineErrors(prev => prev + 1);
     }
 
-    // Advance to next line if the typed string perfectly matches the target
+    // Line Complete Logic
     if (value === targetLine) {
+      // If they made more than 2 mistakes on this line, flag it as a "Weak Line"
+      if (currentLineErrors > 2) {
+        setFailedLines(prev => [...prev, lines[currentLineIndex]]); // Save original unformatted line
+      }
+
       setTimeout(() => {
         if (currentLineIndex < lines.length - 1) {
+          // Move to next line and reset line-specific trackers
           setCurrentLineIndex(prev => prev + 1);
           setUserInput('');
+          setCurrentLineErrors(0);
         } else {
-          alert("Song Complete!"); // We will replace this with a results screen later
-          onExit();
+          // Song is totally finished! Calculate final stats and trigger the results view
+          const finalMinutes = (Date.now() - startTime!) / 60000;
+          const finalWpm = Math.round((correctKeystrokes / 5) / finalMinutes);
+          const finalAccuracy = Math.round((correctKeystrokes / totalKeystrokes) * 100);
+          
+          onComplete({
+            wpm: finalWpm,
+            accuracy: finalAccuracy,
+            failedLines: currentLineErrors > 2 ? [...failedLines, lines[currentLineIndex]] : failedLines
+          });
         }
-      }, 150); // Tiny delay so the user sees the last letter turn sand color
+      }, 150); 
     }
   };
 
-  // Calculate live WPM ( (Chars / 5) / Minutes )
   const elapsedMinutes = startTime ? (Date.now() - startTime) / 60000 : 0;
   const wpm = elapsedMinutes > 0 ? Math.round((correctKeystrokes / 5) / elapsedMinutes) : 0;
-  
-  // Calculate live Accuracy
   const accuracy = totalKeystrokes > 0 ? Math.round((correctKeystrokes / totalKeystrokes) * 100) : 100;
 
   return (
     <div className="container practice-container" onClick={() => inputRef.current?.focus()}>
       <button className="back-button" onClick={onExit}>&larr; Quit Session</button>
 
-      {/* Toggles */}
       <div className="settings-bar">
         <label className="setting-toggle">
           <input type="checkbox" checked={isLowerCase} onChange={() => setIsLowerCase(!isLowerCase)} />
           Force Lowercase
         </label>
-        
-        {/* New Punctuation Toggle */}
         <label className="setting-toggle">
           <input type="checkbox" checked={removePunctuation} onChange={() => setRemovePunctuation(!removePunctuation)} />
           No Punctuation
         </label>
-
         <label className="setting-toggle">
           <input type="checkbox" checked={showWPM} onChange={() => setShowWPM(!showWPM)} />
           Show WPM
@@ -103,7 +125,6 @@ function PracticeSession({ lines, onExit }: { lines: string[], onExit: () => voi
         </label>
       </div>
 
-      {/* Live Stats */}
       <div className="stats-bar">
         {showWPM && <span>WPM: {wpm}</span>}
         {showAccuracy && <span>ACC: {accuracy}%</span>}
@@ -111,9 +132,7 @@ function PracticeSession({ lines, onExit }: { lines: string[], onExit: () => voi
 
       <p className="line-number">Line {currentLineIndex + 1} of {lines.length}</p>
 
-      {/* The Typing Engine */}
       <div className="typing-container">
-        {/* Hidden input catches the physical keystrokes */}
         <input 
           ref={inputRef}
           className="hidden-input"
@@ -125,19 +144,51 @@ function PracticeSession({ lines, onExit }: { lines: string[], onExit: () => voi
           spellCheck="false"
         />
 
-        {/* Visual text rendering */}
         {targetLine.split('').map((char, index) => {
           let stateClass = '';
           if (index < userInput.length) {
             stateClass = userInput[index] === char ? 'correct' : 'incorrect';
           }
-
-          return (
-            <span key={index} className={`char ${stateClass}`}>
-              {char}
-            </span>
-          );
+          return <span key={index} className={`char ${stateClass}`}>{char}</span>;
         })}
+      </div>
+    </div>
+  );
+}
+
+// --- RESULTS SCREEN COMPONENT ---
+function ResultsScreen({ stats, onGoHome, onRetry }: { stats: SessionStats, onGoHome: () => void, onRetry: () => void }) {
+  return (
+    <div className="container">
+      <div className="results-container">
+        <h2 className="results-header">Session Complete!</h2>
+        
+        <div className="metrics-grid">
+          <div className="metric-card">
+            <span className="metric-value">{stats.wpm}</span>
+            <span className="metric-label">WPM</span>
+          </div>
+          <div className="metric-card">
+            <span className="metric-value">{stats.accuracy}%</span>
+            <span className="metric-label">Accuracy</span>
+          </div>
+        </div>
+
+        {stats.failedLines.length > 0 && (
+          <div className="weak-lines-section">
+            <h3>Lines to Review ({stats.failedLines.length})</h3>
+            <ul className="weak-lines-list">
+              {stats.failedLines.map((line, idx) => (
+                <li key={idx}>{line}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <div className="results-actions">
+          <button className="secondary-button" onClick={onGoHome}>Back to Menu</button>
+          <button className="go-button" onClick={onRetry}>Retry Song</button>
+        </div>
       </div>
     </div>
   );
@@ -145,9 +196,10 @@ function PracticeSession({ lines, onExit }: { lines: string[], onExit: () => voi
 
 // --- MAIN APP COMPONENT ---
 function App() {
-  const [currentView, setCurrentView] = useState<'home' | 'practice'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'practice' | 'results'>('home');
   const [rawLyrics, setRawLyrics] = useState('');
   const [songLines, setSongLines] = useState<string[]>([]);
+  const [finalStats, setFinalStats] = useState<SessionStats | null>(null);
 
   const handleStartPractice = () => {
     if (!rawLyrics.trim()) return; 
@@ -160,8 +212,17 @@ function App() {
     setCurrentView('practice');
   };
 
+  const handleSessionComplete = (stats: SessionStats) => {
+    setFinalStats(stats);
+    setCurrentView('results');
+  };
+
   if (currentView === 'practice') {
-    return <PracticeSession lines={songLines} onExit={() => setCurrentView('home')} />;
+    return <PracticeSession lines={songLines} onExit={() => setCurrentView('home')} onComplete={handleSessionComplete} />;
+  }
+
+  if (currentView === 'results' && finalStats) {
+    return <ResultsScreen stats={finalStats} onGoHome={() => setCurrentView('home')} onRetry={() => setCurrentView('practice')} />;
   }
 
   return (

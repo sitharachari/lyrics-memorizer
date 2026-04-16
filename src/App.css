@@ -235,3 +235,100 @@
   color: var(--color-neon-green);
   margin-top: 1rem;
 }
+
+/* --- Results Screen --- */
+.results-container {
+  background-color: var(--color-input-bg);
+  padding: 3rem;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 600px;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.results-header {
+  color: var(--color-sand);
+  font-size: 2.5rem;
+  margin-top: 0;
+  margin-bottom: 2rem;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+.metric-card {
+  background-color: var(--color-bg-dark);
+  padding: 1.5rem;
+  border-radius: 12px;
+}
+
+.metric-value {
+  display: block;
+  font-size: 3rem;
+  font-weight: bold;
+  color: var(--color-neon-green);
+}
+
+.metric-label {
+  color: var(--color-sand);
+  opacity: 0.8;
+  font-size: 1.1rem;
+}
+
+.weak-lines-section {
+  text-align: left;
+  background-color: var(--color-bg-dark);
+  padding: 1.5rem;
+  border-radius: 12px;
+  margin-bottom: 2rem;
+}
+
+.weak-lines-section h3 {
+  color: var(--color-error-orange);
+  margin-top: 0;
+}
+
+.weak-lines-list {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.weak-lines-list li {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgba(210, 203, 143, 0.1); /* Faint sand color */
+  color: var(--color-sand);
+  line-height: 1.4;
+}
+
+.weak-lines-list li:last-child {
+  border-bottom: none;
+}
+
+.results-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.secondary-button {
+  background-color: transparent;
+  color: var(--color-sand);
+  padding: 0.8rem 2rem;
+  border-radius: 20px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  border: 2px solid var(--color-button-green);
+  transition: all 0.2s;
+}
+
+.secondary-button:hover {
+  background-color: var(--color-button-green);
+}
