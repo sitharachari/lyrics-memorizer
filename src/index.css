@@ -24,3 +24,9 @@ textarea, input, button {
   border: none;
   outline: none;
 }
+
+#root {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
