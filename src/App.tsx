@@ -5,6 +5,7 @@ import './App.css';
 function PracticeSession({ lines, onExit }: { lines: string[], onExit: () => void }) {
   // Settings
   const [isLowerCase, setIsLowerCase] = useState(false);
+  const [removePunctuation, setRemovePunctuation] = useState(false); // <-- New State
   const [showWPM, setShowWPM] = useState(true);
   const [showAccuracy, setShowAccuracy] = useState(true);
 
@@ -21,6 +22,13 @@ function PracticeSession({ lines, onExit }: { lines: string[], onExit: () => voi
 
   // The line the user is currently trying to type
   let targetLine = lines[currentLineIndex] || "";
+  
+  if (removePunctuation) {
+    // Removes all punctuation (including apostrophes, so "don't" becomes "dont")
+    // and collapses any double spaces created by removing things like em-dashes.
+    targetLine = targetLine.replace(/[^\w\s]/g, "").replace(/\s+/g, " ");
+  }
+  
   if (isLowerCase) {
     targetLine = targetLine.toLowerCase();
   }
@@ -78,6 +86,13 @@ function PracticeSession({ lines, onExit }: { lines: string[], onExit: () => voi
           <input type="checkbox" checked={isLowerCase} onChange={() => setIsLowerCase(!isLowerCase)} />
           Force Lowercase
         </label>
+        
+        {/* New Punctuation Toggle */}
+        <label className="setting-toggle">
+          <input type="checkbox" checked={removePunctuation} onChange={() => setRemovePunctuation(!removePunctuation)} />
+          No Punctuation
+        </label>
+
         <label className="setting-toggle">
           <input type="checkbox" checked={showWPM} onChange={() => setShowWPM(!showWPM)} />
           Show WPM
