@@ -332,3 +332,68 @@
 .secondary-button:hover {
   background-color: var(--color-button-green);
 }
+
+/* --- Search Results UI --- */
+.search-icon:hover {
+  color: var(--color-sand);
+  transition: color 0.2s ease;
+}
+
+.search-feedback-container {
+  margin-top: 1.5rem;
+  width: 100%;
+  text-align: left;
+}
+
+.status-text {
+  color: var(--color-sand);
+  opacity: 0.7;
+  font-style: italic;
+  text-align: center;
+}
+
+.error-text {
+  color: var(--color-error-orange);
+  text-align: center;
+  font-weight: bold;
+}
+
+.search-results-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  background-color: var(--color-input-bg);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
+
+.search-result-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid rgba(210, 203, 143, 0.1);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.search-result-item:last-child {
+  border-bottom: none;
+}
+
+.search-result-item:hover {
+  background-color: var(--color-button-green);
+}
+
+.track-name {
+  color: var(--color-sand);
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+.artist-name {
+  color: var(--color-neon-green);
+  opacity: 0.8;
+  font-size: 0.9rem;
+}
