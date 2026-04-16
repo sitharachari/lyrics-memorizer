@@ -113,3 +113,59 @@
   color: var(--color-sand);
   opacity: 0.6;
 }
+
+/* --- Practice View Styles --- */
+.practice-container {
+  align-items: flex-start;
+  text-align: left;
+}
+
+.back-button {
+  background: transparent;
+  color: var(--color-sand);
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 2rem;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.back-button:hover {
+  opacity: 1;
+}
+
+.practice-header {
+  margin-bottom: 2rem;
+}
+
+.practice-header h2 {
+  font-size: 2rem;
+  margin: 0 0 0.5rem 0;
+  color: var(--color-neon-green);
+}
+
+.practice-header p {
+  margin: 0;
+  opacity: 0.8;
+}
+
+.debug-lines {
+  width: 100%;
+  background-color: var(--color-input-bg);
+  padding: 2rem;
+  border-radius: 12px;
+}
+
+.debug-line {
+  margin: 0 0 1rem 0;
+  font-size: 1.2rem;
+  line-height: 1.5;
+}
+
+.line-number {
+  color: var(--color-neon-green);
+  opacity: 0.5;
+  margin-right: 1rem;
+  font-size: 1rem;
+}
