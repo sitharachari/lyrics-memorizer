@@ -169,3 +169,69 @@
   margin-right: 1rem;
   font-size: 1rem;
 }
+
+/* --- Settings & Toggles --- */
+.settings-bar {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  background-color: var(--color-input-bg);
+  padding: 1rem;
+  border-radius: 8px;
+}
+
+.setting-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--color-sand);
+  cursor: pointer;
+}
+
+/* --- Typing Test Area --- */
+.typing-container {
+  position: relative;
+  font-size: 2.5rem;
+  font-family: monospace; /* Monospace is best for typing tests */
+  line-height: 1.5;
+  margin-top: 2rem;
+  white-space: pre-wrap;
+  user-select: none;
+}
+
+/* The invisible input that captures keystrokes */
+.hidden-input {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: default;
+  z-index: 10;
+}
+
+/* Character states */
+.char {
+  color: var(--color-button-green); /* Default untyped state */
+}
+
+.char.correct {
+  color: var(--color-sand);
+}
+
+.char.incorrect {
+  color: var(--color-error-orange);
+  background-color: rgba(224, 122, 95, 0.2); /* Slight red background for visibility */
+  border-radius: 4px;
+}
+
+/* --- Stats --- */
+.stats-bar {
+  display: flex;
+  gap: 2rem;
+  font-size: 1.5rem;
+  color: var(--color-neon-green);
+  margin-top: 1rem;
+}
