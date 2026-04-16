@@ -1,12 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import './App.css';
 
-// --- TYPES ---
-type SessionStats = {
-  wpm: number;
-  accuracy: number;
-  failedLines: string[];
-};
 
 // --- PRACTICE SESSION COMPONENT ---
 function PracticeSession({ 
@@ -194,10 +188,13 @@ function ResultsScreen({ stats, onGoHome, onRetry }: { stats: SessionStats, onGo
   );
 }
 
-// ... (Keep your PracticeSession and ResultsScreen components up here!)
-
 // --- TYPES ---
-// Add this new type below your SessionStats type
+type SessionStats = {
+  wpm: number;
+  accuracy: number;
+  failedLines: string[];
+};
+
 type LrcLibTrack = {
   id: number;
   trackName: string;
@@ -207,60 +204,182 @@ type LrcLibTrack = {
   instrumental: boolean;
 };
 
+// --- VERSE SELECTION COMPONENT ---
+function VerseSelectionScreen({ 
+  verses, 
+  onStart, 
+  onCancel 
+}: { 
+  verses: string[][], 
+  onStart: (selectedLines: string[]) => void, 
+  onCancel: () => void 
+}) {
+  // By default, select all verses
+  const [selectedIndices, setSelectedIndices] = useState<number[]>(verses.map((_, i) => i));
+
+  const toggleVerse = (index: number) => {
+    setSelectedIndices(prev => 
+      prev.includes(index) 
+        ? prev.filter(i => i !== index) 
+        : [...prev, index].sort((a, b) => a - b) // Keep them in chronological order
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedIndices.length === verses.length) {
+      setSelectedIndices([]); // Deselect all
+    } else {
+      setSelectedIndices(verses.map((_, i) => i)); // Select all
+    }
+  };
+
+  const handleStart = () => {
+    if (selectedIndices.length === 0) return;
+    // Take the selected verses and flatten them into a single array of lines
+    const flattenedLines = selectedIndices.flatMap(index => verses[index]);
+    onStart(flattenedLines);
+  };
+
+  return (
+    <div className="container verse-selection-container">
+      <button className="back-button" onClick={onCancel}>&larr; Back to Search</button>
+      
+      <div className="verse-selection-header">
+        <h2>Select Verses to Practice</h2>
+        <button className="secondary-button" onClick={handleSelectAll}>
+          {selectedIndices.length === verses.length ? "Deselect All" : "Select Whole Song"}
+        </button>
+      </div>
+
+      <div className="verse-list">
+        {verses.map((verse, index) => (
+          <div 
+            key={index} 
+            className={`verse-card ${selectedIndices.includes(index) ? 'selected' : ''}`}
+            onClick={() => toggleVerse(index)}
+          >
+            <input 
+              type="checkbox" 
+              className="verse-checkbox"
+              checked={selectedIndices.includes(index)}
+              readOnly
+            />
+            <div className="verse-content">
+              {/* Show up to 4 lines of the verse as a preview */}
+              {verse.slice(0, 4).map((line, lineIdx) => (
+                <p key={lineIdx}>{line}</p>
+              ))}
+              {verse.length > 4 && <p style={{ opacity: 0.5 }}><em>+ {verse.length - 4} more lines...</em></p>}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="results-actions" style={{ marginTop: '2rem' }}>
+        <button 
+          className="go-button" 
+          onClick={handleStart}
+          disabled={selectedIndices.length === 0}
+          style={{ opacity: selectedIndices.length === 0 ? 0.5 : 1, width: '100%', padding: '1rem' }}
+        >
+          Start Practice ({selectedIndices.length} verses)
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // --- MAIN APP COMPONENT ---
 function App() {
-  const [currentView, setCurrentView] = useState<'home' | 'practice' | 'results'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'select-verses' | 'practice' | 'results'>('home');
   const [rawLyrics, setRawLyrics] = useState('');
+  
+  // NEW: State to hold our chunked verses
+  const [songVerses, setSongVerses] = useState<string[][]>([]);
+  // EXISITING: State to hold the final flattened lines for the PracticeSession
   const [songLines, setSongLines] = useState<string[]>([]);
   const [finalStats, setFinalStats] = useState<SessionStats | null>(null);
 
-  // --- SEARCH STATE ---
+  const [savedWeakLines, setSavedWeakLines] = useState<string[]>(() => {
+    const saved = localStorage.getItem('lyric-weak-lines');
+    return saved ? JSON.parse(saved) : [];
+  });
+
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<LrcLibTrack[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
 
-  // --- HANDLERS ---
-  const handleStartPractice = () => {
-    if (!rawLyrics.trim()) return; 
-    const parsedLines = rawLyrics
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => line.length > 0);
+  // --- CORE PARSING LOGIC ---
+  const parseLyricsToVerses = (text: string) => {
+    // 1. Split by 2 or more newlines to get the chunks
+    const rawChunks = text.split(/\n{2,}/);
+    
+    // 2. Map over chunks, split into lines, and filter empties
+    const parsedVerses = rawChunks.map(chunk => {
+      return chunk.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+    }).filter(verse => verse.length > 0); // Remove any completely empty chunks
 
-    setSongLines(parsedLines);
+    return parsedVerses;
+  };
+
+  // --- HANDLERS ---
+  const handleProcessLyrics = (textToProcess: string) => {
+    const parsed = parseLyricsToVerses(textToProcess);
+    if (parsed.length === 0) return;
+    
+    setSongVerses(parsed);
+    setCurrentView('select-verses'); // Route to the new screen!
+  };
+
+  const handleStartPracticeFromSelection = (selectedLines: string[]) => {
+    setSongLines(selectedLines);
     setCurrentView('practice');
+  };
+
+  const handleDrillWeakLines = () => {
+    if (savedWeakLines.length === 0) return;
+    const shuffledLines = [...savedWeakLines].sort(() => Math.random() - 0.5);
+    setSongLines(shuffledLines);
+    setCurrentView('practice');
+  };
+
+  const handleClearWeakLines = () => {
+    if (confirm("Are you sure you want to delete all your saved weak lines?")) {
+      localStorage.removeItem('lyric-weak-lines');
+      setSavedWeakLines([]);
+    }
   };
 
   const handleSessionComplete = (stats: SessionStats) => {
     setFinalStats(stats);
     setCurrentView('results');
+
+    if (stats.failedLines.length > 0) {
+      setSavedWeakLines(prevLines => {
+        const combined = Array.from(new Set([...prevLines, ...stats.failedLines]));
+        localStorage.setItem('lyric-weak-lines', JSON.stringify(combined));
+        return combined;
+      });
+    }
   };
 
   const executeSearch = async () => {
     if (!searchQuery.trim()) return;
-    
     setIsSearching(true);
     setSearchError('');
     setSearchResults([]);
 
     try {
-      // Fetch from LRCLIB
       const response = await fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(searchQuery)}`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch from LRCLIB');
-      }
+      if (!response.ok) throw new Error('Failed to fetch from LRCLIB');
 
       const data: LrcLibTrack[] = await response.json();
-      
-      // Filter out instrumentals or songs that don't have text lyrics
       const validTracks = data.filter(track => !track.instrumental && track.plainLyrics);
       
       if (validTracks.length === 0) {
         setSearchError('No lyrics found for that search.');
       } else {
-        // Only show the top 5 results to keep the UI clean
         setSearchResults(validTracks.slice(0, 5));
       }
     } catch (err) {
@@ -270,29 +389,23 @@ function App() {
     }
   };
 
-  const handleSelectTrack = (track: LrcLibTrack) => {
-    if (!track.plainLyrics) return;
-
-    const parsedLines = track.plainLyrics
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => line.length > 0);
-
-    setSongLines(parsedLines);
-    setCurrentView('practice');
-    
-    // Clear search state so it's clean if they come back to the home menu
-    setSearchQuery('');
-    setSearchResults([]);
-  };
-
   // --- RENDERING ---
+  if (currentView === 'select-verses') {
+    return (
+      <VerseSelectionScreen 
+        verses={songVerses} 
+        onStart={handleStartPracticeFromSelection} 
+        onCancel={() => setCurrentView('home')} 
+      />
+    );
+  }
+
   if (currentView === 'practice') {
     return <PracticeSession lines={songLines} onExit={() => setCurrentView('home')} onComplete={handleSessionComplete} />;
   }
 
   if (currentView === 'results' && finalStats) {
-    return <ResultsScreen stats={finalStats} onGoHome={() => setCurrentView('home')} onRetry={() => setCurrentView('practice')} />;
+    return <ResultsScreen stats={finalStats} onGoHome={() => setCurrentView('home')} onRetry={() => setCurrentView('select-verses')} />;
   }
 
   return (
@@ -301,6 +414,24 @@ function App() {
         <h1>Welcome to lyric memorizer!</h1>
         <h2>Get started!</h2>
       </header>
+
+      <div className="weak-lines-dashboard">
+        <h3>Your Weak Lines Database</h3>
+        <p>You have <strong>{savedWeakLines.length}</strong> lines currently saved for review.</p>
+        
+        <div className="results-actions">
+          <button className="go-button" onClick={handleDrillWeakLines} disabled={savedWeakLines.length === 0} style={{ opacity: savedWeakLines.length === 0 ? 0.5 : 1 }}>
+            Drill Weak Lines Now
+          </button>
+          {savedWeakLines.length > 0 && (
+            <button className="secondary-button" onClick={handleClearWeakLines} style={{ borderColor: 'var(--color-error-orange)', color: 'var(--color-error-orange)'}}>
+              Clear Database
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="divider"></div>
       
       <section className="manual-entry-section">
         <textarea 
@@ -310,7 +441,7 @@ function App() {
           onChange={(e) => setRawLyrics(e.target.value)}
         />
         <div className="button-container">
-          <button className="go-button" onClick={handleStartPractice}>go</button>
+          <button className="go-button" onClick={() => handleProcessLyrics(rawLyrics)}>go</button>
         </div>
       </section>
       
@@ -322,32 +453,23 @@ function App() {
       <section className="search-section">
         <div className="search-bar">
           <svg className="icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-          
           <input 
             type="text" 
             placeholder="Enter song title here" 
             className="search-input" 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && executeSearch()} // Trigger on Enter
+            onKeyDown={(e) => e.key === 'Enter' && executeSearch()}
           />
-          
-          {/* Magnifying glass is now clickable */}
-          <svg className="icon search-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" onClick={executeSearch} style={{ cursor: 'pointer' }}>
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
+          <svg className="icon search-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" onClick={executeSearch} style={{ cursor: 'pointer' }}><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
         </div>
-
-        {/* Dynamic Search Results UI */}
         <div className="search-feedback-container">
           {isSearching && <p className="status-text">Searching LRCLIB...</p>}
           {searchError && <p className="error-text">{searchError}</p>}
-          
           {searchResults.length > 0 && (
             <ul className="search-results-list">
               {searchResults.map((track) => (
-                <li key={track.id} className="search-result-item" onClick={() => handleSelectTrack(track)}>
+                <li key={track.id} className="search-result-item" onClick={() => handleProcessLyrics(track.plainLyrics || '')}>
                   <span className="track-name">{track.trackName}</span>
                   <span className="artist-name">{track.artistName}</span>
                 </li>

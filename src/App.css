@@ -397,3 +397,100 @@
   opacity: 0.8;
   font-size: 0.9rem;
 }
+
+/* --- Verse Selection Screen --- */
+.verse-selection-container {
+  width: 100%;
+  max-width: 800px;
+  background-color: var(--color-bg-dark);
+  text-align: left;
+}
+
+.verse-selection-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.verse-selection-header h2 {
+  color: var(--color-sand);
+  margin: 0;
+}
+
+.verse-list {
+  display: grid;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.verse-card {
+  background-color: var(--color-input-bg);
+  padding: 1.5rem;
+  border-radius: 12px;
+  display: flex;
+  gap: 1.5rem;
+  cursor: pointer;
+  transition: transform 0.1s ease, border 0.2s ease;
+  border: 2px solid transparent;
+}
+
+.verse-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(1, 154, 89, 0.3); /* faint neon green */
+}
+
+.verse-card.selected {
+  border-color: var(--color-neon-green);
+}
+
+/* Custom Checkbox */
+.verse-checkbox {
+  appearance: none;
+  background-color: var(--color-bg-dark);
+  margin: 0;
+  font: inherit;
+  color: currentColor;
+  width: 1.5em;
+  height: 1.5em;
+  border: 2px solid var(--color-sand);
+  border-radius: 0.25em;
+  display: grid;
+  place-content: center;
+  cursor: pointer;
+  margin-top: 0.2rem;
+}
+
+.verse-checkbox::before {
+  content: "";
+  width: 0.8em;
+  height: 0.8em;
+  transform: scale(0);
+  transition: 120ms transform ease-in-out;
+  box-shadow: inset 1em 1em var(--color-neon-green);
+  background-color: transform-origin;
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+}
+
+.verse-checkbox:checked::before {
+  transform: scale(1);
+}
+
+.verse-checkbox:checked {
+  border-color: var(--color-neon-green);
+}
+
+.verse-content {
+  color: var(--color-sand);
+  font-size: 1.1rem;
+  line-height: 1.5;
+  opacity: 0.9;
+}
+
+.verse-content p {
+  margin: 0 0 0.5rem 0;
+}
+
+.verse-content p:last-child {
+  margin: 0;
+}
