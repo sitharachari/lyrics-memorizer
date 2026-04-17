@@ -233,6 +233,7 @@ function App() {
   const [songVerses, setSongVerses] = useState<string[][]>([]); // For the selection screen
   const [activePracticeVerses, setActivePracticeVerses] = useState<string[][]>([]); // For the actual typing test
   const [finalStats, setFinalStats] = useState<SessionStats | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   // Initialize with our new verse-based DB key
   const [savedWeakVerses, setSavedWeakVerses] = useState<string[][]>(() => {
@@ -269,12 +270,15 @@ function App() {
     setCurrentView('practice');
   };
 
-  const handleClearDatabase = () => {
-    if (confirm("Are you sure you want to delete all your saved weak verses?")) {
+  const handleClearDatabaseClick = () => {
+      setIsDeleteModalOpen(true); // 
+    };
+
+    const confirmClearDatabase = () => {
       localStorage.removeItem('lyric-weak-verses');
       setSavedWeakVerses([]);
-    }
-  };
+      setIsDeleteModalOpen(false); // Close modal after deleting
+    };
 
   const handleSessionComplete = (stats: SessionStats) => {
     setFinalStats(stats);
@@ -330,7 +334,16 @@ function App() {
         <p>You have <strong>{savedWeakVerses.length}</strong> verses currently saved for review.</p>
         <div className="results-actions">
           <button className="go-button" onClick={handleDrillWeakVerses} disabled={savedWeakVerses.length === 0} style={{ opacity: savedWeakVerses.length === 0 ? 0.5 : 1 }}>Drill Weak Verses Now</button>
-          {savedWeakVerses.length > 0 && <button className="secondary-button" onClick={handleClearDatabase} style={{ borderColor: 'var(--color-error-orange)', color: 'var(--color-error-orange)'}}>Clear Database</button>}
+        
+          {savedWeakVerses.length > 0 && (
+            <button 
+              className="secondary-button" 
+              onClick={handleClearDatabaseClick} 
+              style={{ borderColor: 'var(--color-error-orange)', color: 'var(--color-error-orange)'}}
+            >
+              Clear Database
+            </button>
+          )}
         </div>
       </div>
 
@@ -364,8 +377,34 @@ function App() {
           )}
         </div>
       </section>
-    </div>
+      {/* ... the rest of your app (search section, etc) */}
+      
+      {/* NEW: Custom Confirmation Modal */}
+      {isDeleteModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3>Are you sure?</h3>
+            <p>This will permanently delete all your saved weak verses. This action cannot be undone.</p>
+            <div className="modal-actions">
+              <button 
+                className="secondary-button" 
+                onClick={() => setIsDeleteModalOpen(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="go-button" 
+                onClick={confirmClearDatabase}
+                style={{ backgroundColor: 'var(--color-error-orange)', color: 'var(--color-bg-dark)', borderColor: 'var(--color-error-orange)' }}
+              >
+                Delete Everything
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div> 
   );
 }
-
 export default App;
