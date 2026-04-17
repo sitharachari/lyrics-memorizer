@@ -29,5 +29,7 @@ textarea, input, button {
 #root {
   width: 100%;
   display: flex;
-  justify-content: center;
+  flex-direction: column; /* This forces the navbar to the top */
+  align-items: center;    /* This centers everything horizontally */
+  min-height: 100vh;
 }
