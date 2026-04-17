@@ -4,7 +4,6 @@ import './App.css';
 // --- TYPES ---
 type SessionStats = { wpm: number; accuracy: number; failedVerses: string[][] };
 
-// UPDATED: Types for Test Mode now track individual word statuses
 type WordStatus = 'correct' | 'typo' | 'wrong' | 'missing';
 type GradedWord = { target: string; typed: string; status: WordStatus };
 type TestLineResult = { target: string; typed: string; isCorrect: boolean; verseIndex: number; gradedWords: GradedWord[] };
@@ -25,10 +24,8 @@ const THEMES: Theme[] = [
 ];
 
 // --- UTILS ---
-// Helper to strip punctuation and normalize spaces for fair grading
 const normalizeString = (str: string) => str.toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ").trim();
 
-// NEW: Levenshtein Distance Algorithm (calculates how many edits to change string a into string b)
 const levenshteinDistance = (a: string, b: string): number => {
   if (a.length === 0) return b.length;
   if (b.length === 0) return a.length;
@@ -39,9 +36,9 @@ const levenshteinDistance = (a: string, b: string): number => {
     for (let i = 1; i <= a.length; i += 1) {
       const indicator = a[i - 1] === b[j - 1] ? 0 : 1;
       matrix[j][i] = Math.min(
-        matrix[j][i - 1] + 1, // insertion
-        matrix[j - 1][i] + 1, // deletion
-        matrix[j - 1][i - 1] + indicator // substitution
+        matrix[j][i - 1] + 1, 
+        matrix[j - 1][i] + 1, 
+        matrix[j - 1][i - 1] + indicator 
       );
     }
   }
@@ -49,10 +46,10 @@ const levenshteinDistance = (a: string, b: string): number => {
 };
 
 // --- COMPONENTS ---
-function Navbar({ onOpenSettings }: { onOpenSettings: () => void }) {
+function Navbar({ onOpenSettings, onOpenAbout }: { onOpenSettings: () => void, onOpenAbout: () => void }) {
   return (
     <nav className="navbar">
-      <div className="nav-logo">
+      <div className="nav-logo" onClick={onOpenAbout}>
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
         <span>lyric memorizer</span>
       </div>
@@ -97,7 +94,26 @@ function SettingsModal({ currentThemeId, onSelectTheme, onClose, onClearData }: 
   );
 }
 
-// --- NEW: TEST SESSION COMPONENT ---
+// --- NEW: ABOUT SCREEN ---
+function AboutScreen({ onGoHome }: { onGoHome: () => void }) {
+  return (
+    <div className="container">
+      <div className="results-container" style={{ textAlign: 'left', maxWidth: '600px' }}>
+        <button className="back-button" onClick={onGoHome}>&larr; Back to Library</button>
+        <h2 className="results-header" style={{ textAlign: 'left', marginTop: '1rem', color: 'var(--color-neon-green)' }}>About</h2>
+        <div style={{ color: 'var(--color-sand)', fontSize: '1.2rem', lineHeight: '1.6' }}>
+          <p>
+            I created this app because I tend to hyper fixate on a song and I want to memorize it to be able to sing it as fast as I can.
+          </p>
+          <p>
+            I also love typing tests and practicing typing, so this app is a specialized mix of both!
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TestSession({ verses, onExit, onComplete }: { verses: string[][], onExit: () => void, onComplete: (stats: TestStats) => void }) {
   const [currentVerseIndex, setCurrentVerseIndex] = useState(0);
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
@@ -127,13 +143,11 @@ function TestSession({ verses, onExit, onComplete }: { verses: string[][], onExi
     e.preventDefault();
     if (!userInput.trim()) return;
 
-    // Word-by-word fuzzy grading
     const targetWords = normalizeString(targetLine).split(' ');
     const typedWords = normalizeString(userInput).split(' ');
     let lineHasMemoryErrors = false;
     const gradedWords: GradedWord[] = [];
 
-    // Grade expected words
     targetWords.forEach((tWord, i) => {
       const inputWord = typedWords[i] || '';
       
@@ -143,9 +157,7 @@ function TestSession({ verses, onExit, onComplete }: { verses: string[][], onExi
         lineHasMemoryErrors = true;
         gradedWords.push({ target: tWord, typed: inputWord, status: 'missing' });
       } else {
-        // Check for typos using Levenshtein distance
         const distance = levenshteinDistance(tWord, inputWord);
-        // Dynamic typo tolerance based on word length
         const maxTypoDist = tWord.length <= 2 ? 0 : (tWord.length <= 5 ? 1 : 2);
 
         if (distance <= maxTypoDist) {
@@ -157,7 +169,6 @@ function TestSession({ verses, onExit, onComplete }: { verses: string[][], onExi
       }
     });
 
-    // Check if they typed extra unexpected words at the end
     if (typedWords.length > targetWords.length) {
       lineHasMemoryErrors = true;
       for (let i = targetWords.length; i < typedWords.length; i++) {
@@ -165,31 +176,21 @@ function TestSession({ verses, onExit, onComplete }: { verses: string[][], onExi
       }
     }
 
-    // A line is "correct" (100% accuracy) if it only contains correct words and typos
     const isLineForgiven = !lineHasMemoryErrors && !isHintActive;
 
     if (!isLineForgiven) {
       setFailedVerseIndices(prev => new Set(prev).add(currentVerseIndex));
     }
 
-    const currentResult: TestLineResult = { 
-      target: targetLine, 
-      typed: userInput, 
-      isCorrect: isLineForgiven, 
-      verseIndex: currentVerseIndex,
-      gradedWords: gradedWords
-    };
-
+    const currentResult: TestLineResult = { target: targetLine, typed: userInput, isCorrect: isLineForgiven, verseIndex: currentVerseIndex, gradedWords };
     setResults(prev => [...prev, currentResult]);
 
-    // Advance Logic
     if (currentLineIndex < verses[currentVerseIndex].length - 1) {
       setCurrentLineIndex(prev => prev + 1);
     } else if (currentVerseIndex < verses.length - 1) {
       setCurrentVerseIndex(prev => prev + 1);
       setCurrentLineIndex(0);
     } else {
-      // Test Complete
       const finalFailedVerses = Array.from(failedVerseIndices).map(idx => verses[idx]);
       onComplete({
         totalLines: results.length + 1,
@@ -226,21 +227,12 @@ function TestSession({ verses, onExit, onComplete }: { verses: string[][], onExi
       )}
 
       <form onSubmit={handleSubmit} style={{ width: '100%' }}>
-        <input 
-          ref={inputRef}
-          className="test-input"
-          value={userInput}
-          onChange={(e) => setUserInput(e.target.value)}
-          placeholder="Type the line here and press Enter..."
-          autoComplete="off"
-          spellCheck="false"
-        />
+        <input ref={inputRef} className="test-input" value={userInput} onChange={(e) => setUserInput(e.target.value)} placeholder="Type the line here and press Enter..." autoComplete="off" spellCheck="false" />
       </form>
     </div>
   );
 }
 
-// --- NEW: TEST RESULTS COMPONENT ---
 function TestResultsScreen({ stats, onGoHome, onRetry }: { stats: TestStats, onGoHome: () => void, onRetry: () => void }) {
   const accuracy = Math.round((stats.correctLines / stats.totalLines) * 100);
 
@@ -257,7 +249,6 @@ function TestResultsScreen({ stats, onGoHome, onRetry }: { stats: TestStats, onG
           <h3>Line Review</h3>
           <div className="grading-list">
             {stats.results.map((result, idx) => {
-              // If it's perfect, don't clutter the screen
               if (result.isCorrect && result.gradedWords.every(w => w.status === 'correct')) {
                 return (
                   <div key={idx} className="grade-card correct">
@@ -270,22 +261,15 @@ function TestResultsScreen({ stats, onGoHome, onRetry }: { stats: TestStats, onG
                 <div key={idx} className={`grade-card ${result.isCorrect ? 'correct' : 'incorrect'}`}>
                   <p className="grade-label">Target Line:</p>
                   <p className="grade-text" style={{ color: 'var(--color-sand)' }}>{result.target}</p>
-                  
                   <p className="grade-label" style={{ marginTop: '1rem', color: result.isCorrect ? 'var(--color-sand)' : 'var(--color-error-orange)' }}>
                     {result.isCorrect ? "Your Input (Typos Forgiven):" : "Your Input (Errors Highlighted):"}
                   </p>
-                  
                   <p className="grade-text">
                     {result.gradedWords.map((word, wIdx) => {
-                      if (word.status === 'correct') {
-                         return <span key={wIdx} className="diff-word">{word.typed}</span>;
-                      } else if (word.status === 'missing') {
-                         return <span key={wIdx} className="diff-word missing" title="Missed word">{word.target}</span>;
-                      } else if (word.status === 'typo') {
-                         return <span key={wIdx} className="diff-word typo" title={`Target: ${word.target}`}>{word.typed}</span>;
-                      } else {
-                         return <span key={wIdx} className="diff-word wrong" title={`Target: ${word.target}`}>{word.typed}</span>;
-                      }
+                      if (word.status === 'correct') return <span key={wIdx} className="diff-word">{word.typed}</span>;
+                      else if (word.status === 'missing') return <span key={wIdx} className="diff-word missing" title="Missed word">{word.target}</span>;
+                      else if (word.status === 'typo') return <span key={wIdx} className="diff-word typo" title={`Target: ${word.target}`}>{word.typed}</span>;
+                      else return <span key={wIdx} className="diff-word wrong" title={`Target: ${word.target}`}>{word.typed}</span>;
                     })}
                   </p>
                 </div>
@@ -303,9 +287,7 @@ function TestResultsScreen({ stats, onGoHome, onRetry }: { stats: TestStats, onG
   );
 }
 
-// --- EXISTING: PRACTICE SESSION COMPONENT (Kept unchanged for brevity, assume full logic is here) ---
 function PracticeSession({ verses, onExit, onComplete }: { verses: string[][], onExit: () => void, onComplete: (stats: SessionStats) => void }) {
-  // ... (Keep your exact PracticeSession component code here!)
   const [isLowerCase, setIsLowerCase] = useState(false);
   const [removePunctuation, setRemovePunctuation] = useState(false);
   const [showWPM, setShowWPM] = useState(true);
@@ -353,12 +335,22 @@ function PracticeSession({ verses, onExit, onComplete }: { verses: string[][], o
     }
   };
 
+  const elapsedMinutes = startTime ? (Date.now() - startTime) / 60000 : 0;
+  const wpm = elapsedMinutes > 0 ? Math.round((correctKeystrokes / 5) / elapsedMinutes) : 0;
+  const accuracy = totalKeystrokes > 0 ? Math.round((correctKeystrokes / totalKeystrokes) * 100) : 100;
+
   return (
     <div className="container practice-container" onClick={() => inputRef.current?.focus()}>
       <button className="back-button" onClick={onExit}>&larr; Quit Session</button>
       <div className="settings-bar">
         <label className="setting-toggle"><input type="checkbox" checked={isLowerCase} onChange={() => setIsLowerCase(!isLowerCase)} />Force Lowercase</label>
         <label className="setting-toggle"><input type="checkbox" checked={removePunctuation} onChange={() => setRemovePunctuation(!removePunctuation)} />No Punctuation</label>
+        <label className="setting-toggle"><input type="checkbox" checked={showWPM} onChange={() => setShowWPM(!showWPM)} />Show WPM</label>
+        <label className="setting-toggle"><input type="checkbox" checked={showAccuracy} onChange={() => setShowAccuracy(!showAccuracy)} />Show Accuracy</label>
+      </div>
+      <div className="stats-bar">
+        {showWPM && <span>WPM: {wpm}</span>}
+        {showAccuracy && <span>ACC: {accuracy}%</span>}
       </div>
       <p className="line-number">Verse {currentVerseIndex + 1} of {verses.length} <span style={{opacity: 0.5}}>(Line {currentLineIndex + 1})</span></p>
       <div className="typing-container">
@@ -371,7 +363,6 @@ function PracticeSession({ verses, onExit, onComplete }: { verses: string[][], o
   );
 }
 
-// --- UPDATED: VERSE SELECTION COMPONENT ---
 function VerseSelectionScreen({ verses, onStartPractice, onStartTest, onCancel }: { verses: string[][], onStartPractice: (v: string[][]) => void, onStartTest: (v: string[][]) => void, onCancel: () => void }) {
   const [selectedIndices, setSelectedIndices] = useState<number[]>(verses.map((_, i) => i));
 
@@ -402,7 +393,6 @@ function VerseSelectionScreen({ verses, onStartPractice, onStartTest, onCancel }
       </div>
 
       <div className="results-actions" style={{ marginTop: '2rem', display: 'flex', gap: '1rem' }}>
-        {/* We now have TWO start buttons depending on what mode you want */}
         <button className="secondary-button" onClick={() => onStartPractice(selectedIndices.map(i => verses[i]))} disabled={selectedIndices.length === 0} style={{ flex: 1 }}>
           Practice Mode (Guided)
         </button>
@@ -414,9 +404,7 @@ function VerseSelectionScreen({ verses, onStartPractice, onStartTest, onCancel }
   );
 }
 
-// --- EXISTING: PRACTICE RESULTS COMPONENT ---
 function ResultsScreen({ stats, onGoHome, onRetry }: { stats: SessionStats, onGoHome: () => void, onRetry: () => void }) {
-  // ... (Keep your exact ResultsScreen component code here)
   return (
     <div className="container">
       <div className="results-container">
@@ -436,8 +424,7 @@ function ResultsScreen({ stats, onGoHome, onRetry }: { stats: SessionStats, onGo
 
 // --- MAIN APP COMPONENT ---
 function App() {
-  // Added 'test' and 'test-results' to the view router
-  const [currentView, setCurrentView] = useState<'home' | 'select-verses' | 'practice' | 'test' | 'results' | 'test-results'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'select-verses' | 'practice' | 'test' | 'results' | 'test-results' | 'about'>('home');
   const [rawLyrics, setRawLyrics] = useState('');
   
   const [songLibrary, setSongLibrary] = useState<SavedSong[]>(() => {
@@ -491,11 +478,9 @@ function App() {
     setSongVerses(song.fullVerses); setCurrentView('select-verses'); 
   };
 
-  // ROUTING HANDLERS
   const handleStartPractice = (selectedVerses: string[][]) => { setActivePracticeVerses(selectedVerses); setCurrentView('practice'); };
   const handleStartTest = (selectedVerses: string[][]) => { setActivePracticeVerses(selectedVerses); setCurrentView('test'); };
 
-  // SAVE LOGIC: Merges failed verses into the library whether it was a Test or a Practice session
   const saveFailedVersesToLibrary = (failedVerses: string[][]) => {
     if (activeSongMeta) {
       setSongLibrary(prev => {
@@ -551,7 +536,7 @@ function App() {
 
   return (
     <>
-      <Navbar onOpenSettings={() => setIsSettingsOpen(true)} />
+      <Navbar onOpenSettings={() => setIsSettingsOpen(true)} onOpenAbout={() => setCurrentView('about')} />
       {isSettingsOpen && <SettingsModal currentThemeId={activeThemeId} onSelectTheme={setActiveThemeId} onClose={() => setIsSettingsOpen(false)} onClearData={() => setIsDeleteModalOpen(true)} />}
       
       {isDeleteModalOpen && (
@@ -567,7 +552,9 @@ function App() {
         </div>
       )}
 
-      {currentView === 'select-verses' ? (
+      {currentView === 'about' ? (
+        <AboutScreen onGoHome={() => setCurrentView('home')} />
+      ) : currentView === 'select-verses' ? (
         <VerseSelectionScreen verses={songVerses} onStartPractice={handleStartPractice} onStartTest={handleStartTest} onCancel={() => setCurrentView('home')} />
       ) : currentView === 'results' && practiceStats ? (
         <ResultsScreen stats={practiceStats} onGoHome={() => setCurrentView('home')} onRetry={() => setCurrentView('select-verses')} />

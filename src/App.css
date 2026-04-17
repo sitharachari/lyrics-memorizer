@@ -565,6 +565,12 @@
   font-size: 1.5rem;
   font-weight: bold;
   color: var(--color-neon-green);
+  cursor: pointer; /* Makes it look clickable */
+  transition: opacity 0.2s ease;
+}
+
+.nav-logo:hover {
+  opacity: 0.8;
 }
 
 .nav-icon-button {
