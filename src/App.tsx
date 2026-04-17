@@ -2,52 +2,28 @@ import { useState, useEffect, useRef } from 'react';
 import './App.css';
 
 // --- TYPES ---
-type SessionStats = { 
-  wpm: number; 
-  accuracy: number; 
-  failedVerses: string[][]; 
-};
+type SessionStats = { wpm: number; accuracy: number; failedVerses: string[][] };
+type LrcLibTrack = { id: number; trackName: string; artistName: string; plainLyrics: string | null; instrumental: boolean; };
+type Theme = { id: string; name: string; colors: Record<string, string>; };
 
-type LrcLibTrack = { 
-  id: number; 
-  trackName: string; 
-  artistName: string; 
-  plainLyrics: string | null; 
-  instrumental: boolean; 
-};
-
-type Theme = { 
-  id: string; 
-  name: string; 
-  colors: Record<string, string>; 
+// NEW: The structured song library type
+type SavedSong = {
+  id: string;
+  title: string;
+  artist: string;
+  fullVerses: string[][];
+  weakVerses: string[][];
+  lastPracticed: number;
 };
 
 // --- THEME CONFIGURATION ---
 const THEMES: Theme[] = [
-  {
-    id: 'default', name: 'Pine & Sand',
-    colors: { '--color-sand': '#D2CB8F', '--color-neon-green': '#019A59', '--color-button-green': '#00674F', '--color-input-bg': '#00383D', '--color-bg-dark': '#021B32', '--color-error-orange': '#E07A5F' }
-  },
-  {
-    id: 'aqua', name: 'Aqua Turquoise',
-    colors: { '--color-bg-dark': '#201142', '--color-input-bg': '#254D7F', '--color-button-green': '#30A4B1', '--color-neon-green': '#6ED8B3', '--color-sand': '#DFFBD3', '--color-error-orange': '#FF6B6B' }
-  },
-  {
-    id: 'pink', name: 'Cherry Frost',
-    colors: { '--color-bg-dark': '#480930', '--color-input-bg': '#B51260', '--color-button-green': '#FE327D', '--color-neon-green': '#FE80AF', '--color-sand': '#FFDBE9', '--color-error-orange': '#FFD166' }
-  },
-  {
-    id: 'sunset', name: 'Caramel Sunset',
-    colors: { '--color-bg-dark': '#25203F', '--color-input-bg': '#7A4B5B', '--color-button-green': '#CC765D', '--color-neon-green': '#FEB872', '--color-sand': '#FEECD6', '--color-error-orange': '#06D6A0' }
-  },
-  {
-    id: 'purple', name: 'Indigo Velvet',
-    colors: { '--color-bg-dark': '#24143F', '--color-input-bg': '#4E3677', '--color-button-green': '#8761AF', '--color-neon-green': '#C795D9', '--color-sand': '#EFDCEF', '--color-error-orange': '#FF595E' }
-  },
-  {
-    id: 'red-velvet', name: 'Night Bordeaux',
-    colors: { '--color-bg-dark': '#480412', '--color-input-bg': '#7D0F19', '--color-button-green': '#BB2D26', '--color-neon-green': '#E1AD86', '--color-sand': '#F5DCB9', '--color-error-orange': '#00F5D4' }
-  }
+  { id: 'default', name: 'Pine & Sand', colors: { '--color-sand': '#D2CB8F', '--color-neon-green': '#019A59', '--color-button-green': '#00674F', '--color-input-bg': '#00383D', '--color-bg-dark': '#021B32', '--color-error-orange': '#E07A5F' } },
+  { id: 'aqua', name: 'Aqua Turquoise', colors: { '--color-bg-dark': '#201142', '--color-input-bg': '#254D7F', '--color-button-green': '#30A4B1', '--color-neon-green': '#6ED8B3', '--color-sand': '#DFFBD3', '--color-error-orange': '#FF6B6B' } },
+  { id: 'pink', name: 'Cherry Frost', colors: { '--color-bg-dark': '#480930', '--color-input-bg': '#B51260', '--color-button-green': '#FE327D', '--color-neon-green': '#FE80AF', '--color-sand': '#FFDBE9', '--color-error-orange': '#FFD166' } },
+  { id: 'sunset', name: 'Caramel Sunset', colors: { '--color-bg-dark': '#25203F', '--color-input-bg': '#7A4B5B', '--color-button-green': '#CC765D', '--color-neon-green': '#FEB872', '--color-sand': '#FEECD6', '--color-error-orange': '#06D6A0' } },
+  { id: 'purple', name: 'Indigo Velvet', colors: { '--color-bg-dark': '#24143F', '--color-input-bg': '#4E3677', '--color-button-green': '#8761AF', '--color-neon-green': '#C795D9', '--color-sand': '#EFDCEF', '--color-error-orange': '#FF595E' } },
+  { id: 'red-velvet', name: 'Night Bordeaux', colors: { '--color-bg-dark': '#480412', '--color-input-bg': '#7D0F19', '--color-button-green': '#BB2D26', '--color-neon-green': '#E1AD86', '--color-sand': '#F5DCB9', '--color-error-orange': '#00F5D4' } }
 ];
 
 // --- NAVIGATION & SETTINGS COMPONENTS ---
@@ -65,7 +41,7 @@ function Navbar({ onOpenSettings }: { onOpenSettings: () => void }) {
   );
 }
 
-function SettingsModal({ currentThemeId, onSelectTheme, onClose }: { currentThemeId: string, onSelectTheme: (id: string) => void, onClose: () => void }) {
+function SettingsModal({ currentThemeId, onSelectTheme, onClose, onClearData }: { currentThemeId: string, onSelectTheme: (id: string) => void, onClose: () => void, onClearData: () => void }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={e => e.stopPropagation()}>
@@ -74,7 +50,7 @@ function SettingsModal({ currentThemeId, onSelectTheme, onClose }: { currentThem
           <button className="nav-icon-button" onClick={onClose}>&times;</button>
         </div>
         
-        <div style={{ textAlign: 'left' }}>
+        <div style={{ textAlign: 'left', marginBottom: '2rem' }}>
           <h4 style={{ color: 'var(--color-neon-green)', marginBottom: '1rem' }}>Color Theme</h4>
           <div className="theme-grid">
             {THEMES.map(theme => (
@@ -90,6 +66,12 @@ function SettingsModal({ currentThemeId, onSelectTheme, onClose }: { currentThem
               </div>
             ))}
           </div>
+        </div>
+
+        <div style={{ borderTop: '1px solid var(--color-input-bg)', paddingTop: '1.5rem' }}>
+           <button className="go-button" style={{ backgroundColor: 'transparent', color: 'var(--color-error-orange)', borderColor: 'var(--color-error-orange)', width: '100%' }} onClick={onClearData}>
+             Wipe All Saved Data
+           </button>
         </div>
       </div>
     </div>
@@ -216,7 +198,7 @@ function VerseSelectionScreen({ verses, onStart, onCancel }: { verses: string[][
 
   return (
     <div className="container verse-selection-container">
-      <button className="back-button" onClick={onCancel}>&larr; Back to Search</button>
+      <button className="back-button" onClick={onCancel}>&larr; Back</button>
       <div className="verse-selection-header">
         <h2>Select Verses to Practice</h2>
         <button className="secondary-button" onClick={() => setSelectedIndices(selectedIndices.length === verses.length ? [] : verses.map((_, i) => i))}>
@@ -270,8 +252,8 @@ function ResultsScreen({ stats, onGoHome, onRetry }: { stats: SessionStats, onGo
         )}
 
         <div className="results-actions">
-          <button className="secondary-button" onClick={onGoHome}>Back to Menu</button>
-          <button className="go-button" onClick={onRetry}>Retry</button>
+          <button className="secondary-button" onClick={onGoHome}>Back to Library</button>
+          <button className="go-button" onClick={onRetry}>Practice Again</button>
         </div>
       </div>
     </div>
@@ -283,34 +265,33 @@ function App() {
   const [currentView, setCurrentView] = useState<'home' | 'select-verses' | 'practice' | 'results'>('home');
   const [rawLyrics, setRawLyrics] = useState('');
   
-  const [songVerses, setSongVerses] = useState<string[][]>([]);
-  const [activePracticeVerses, setActivePracticeVerses] = useState<string[][]>([]);
-  const [finalStats, setFinalStats] = useState<SessionStats | null>(null);
-
-  const [savedWeakVerses, setSavedWeakVerses] = useState<string[][]>(() => {
-    const saved = localStorage.getItem('lyric-weak-verses');
+  // NEW: The structured library data
+  const [songLibrary, setSongLibrary] = useState<SavedSong[]>(() => {
+    const saved = localStorage.getItem('lyric-library');
     return saved ? JSON.parse(saved) : [];
   });
+
+  // Keep track of the exact song we are working on so we can save metrics to it
+  const [activeSongMeta, setActiveSongMeta] = useState<{ id: string, title: string, artist: string, fullVerses: string[][] } | null>(null);
+  
+  const [songVerses, setSongVerses] = useState<string[][]>([]); // For the selection screen
+  const [activePracticeVerses, setActivePracticeVerses] = useState<string[][]>([]); // For the typing test
+  const [finalStats, setFinalStats] = useState<SessionStats | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<LrcLibTrack[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
 
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  
-  const [activeThemeId, setActiveThemeId] = useState<string>(() => {
-    return localStorage.getItem('lyric-theme') || 'default';
-  });
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [activeThemeId, setActiveThemeId] = useState<string>(() => localStorage.getItem('lyric-theme') || 'default');
 
   // THEME ENGINE
   useEffect(() => {
     const theme = THEMES.find(t => t.id === activeThemeId) || THEMES[0];
     const root = document.documentElement;
-    Object.entries(theme.colors).forEach(([property, value]) => {
-      root.style.setProperty(property, value);
-    });
+    Object.entries(theme.colors).forEach(([property, value]) => root.style.setProperty(property, value));
     localStorage.setItem('lyric-theme', activeThemeId);
   }, [activeThemeId]);
 
@@ -319,11 +300,44 @@ function App() {
     return text.split(/\n{2,}/).map(chunk => chunk.split('\n').map(l => l.trim()).filter(l => l.length > 0)).filter(v => v.length > 0);
   };
 
-  const handleProcessLyrics = (textToProcess: string) => {
-    const parsed = parseLyricsToVerses(textToProcess);
+  // Flow 1: Pasting Lyrics
+  const handlePastedLyrics = () => {
+    const parsed = parseLyricsToVerses(rawLyrics);
     if (parsed.length === 0) return;
+    
+    setActiveSongMeta({ id: 'custom-' + Date.now(), title: 'Custom Song', artist: 'Unknown', fullVerses: parsed });
     setSongVerses(parsed);
     setCurrentView('select-verses');
+  };
+
+  // Flow 2: API Search
+  const handleSelectTrack = (track: LrcLibTrack) => {
+    if (!track.plainLyrics) return;
+    const parsed = parseLyricsToVerses(track.plainLyrics);
+    
+    setActiveSongMeta({ id: track.id.toString(), title: track.trackName, artist: track.artistName, fullVerses: parsed });
+    setSongVerses(parsed);
+    setCurrentView('select-verses');
+    
+    setSearchQuery('');
+    setSearchResults([]);
+  };
+
+  // Flow 3: Clicking a song from the Library
+  const handleResumeSong = (song: SavedSong) => {
+    setActiveSongMeta({ id: song.id, title: song.title, artist: song.artist, fullVerses: song.fullVerses });
+    setSongVerses(song.fullVerses);
+    setCurrentView('select-verses'); // Sends them to verse selection so they can choose
+  };
+
+  const handleDrillSongWeak = (song: SavedSong) => {
+    if (song.weakVerses.length === 0) return;
+    setActiveSongMeta({ id: song.id, title: song.title, artist: song.artist, fullVerses: song.fullVerses });
+    
+    // Shuffle the weak verses and launch straight into practice
+    const shuffled = [...song.weakVerses].sort(() => Math.random() - 0.5);
+    setActivePracticeVerses(shuffled);
+    setCurrentView('practice');
   };
 
   const handleStartPracticeFromSelection = (selectedVerses: string[][]) => {
@@ -331,33 +345,56 @@ function App() {
     setCurrentView('practice');
   };
 
-  const handleDrillWeakVerses = () => {
-    if (savedWeakVerses.length === 0) return;
-    const shuffled = [...savedWeakVerses].sort(() => Math.random() - 0.5);
-    setActivePracticeVerses(shuffled);
-    setCurrentView('practice');
-  };
-
-  const confirmClearDatabase = () => {
-    localStorage.removeItem('lyric-weak-verses');
-    setSavedWeakVerses([]);
-    setIsDeleteModalOpen(false);
-  };
-
+  // SAVE LOGIC: Runs when a session ends
   const handleSessionComplete = (stats: SessionStats) => {
     setFinalStats(stats);
     setCurrentView('results');
 
-    if (stats.failedVerses.length > 0) {
-      setSavedWeakVerses(prev => {
-        const existingStrings = prev.map(v => JSON.stringify(v));
-        const newStrings = stats.failedVerses.map(v => JSON.stringify(v));
-        const combinedStrings = Array.from(new Set([...existingStrings, ...newStrings]));
-        const combined = combinedStrings.map(s => JSON.parse(s));
-        localStorage.setItem('lyric-weak-verses', JSON.stringify(combined));
-        return combined;
+    if (activeSongMeta) {
+      setSongLibrary(prev => {
+        const existingSongIndex = prev.findIndex(s => s.id === activeSongMeta.id);
+        let updatedSong: SavedSong;
+
+        if (existingSongIndex >= 0) {
+          // Song exists, merge the new weak verses with the old ones
+          const existingSong = prev[existingSongIndex];
+          const existingStrings = existingSong.weakVerses.map(v => JSON.stringify(v));
+          const newStrings = stats.failedVerses.map(v => JSON.stringify(v));
+          const combinedStrings = Array.from(new Set([...existingStrings, ...newStrings]));
+          
+          updatedSong = {
+            ...existingSong,
+            weakVerses: combinedStrings.map(s => JSON.parse(s)),
+            lastPracticed: Date.now()
+          };
+          
+          const newLibrary = [...prev];
+          newLibrary[existingSongIndex] = updatedSong;
+          localStorage.setItem('lyric-library', JSON.stringify(newLibrary));
+          return newLibrary;
+        } else {
+          // Brand new song, add it to the library
+          updatedSong = {
+            id: activeSongMeta.id,
+            title: activeSongMeta.title,
+            artist: activeSongMeta.artist,
+            fullVerses: activeSongMeta.fullVerses,
+            weakVerses: stats.failedVerses,
+            lastPracticed: Date.now()
+          };
+          const newLibrary = [updatedSong, ...prev];
+          localStorage.setItem('lyric-library', JSON.stringify(newLibrary));
+          return newLibrary;
+        }
       });
     }
+  };
+
+  const confirmClearDatabase = () => {
+    localStorage.removeItem('lyric-library');
+    setSongLibrary([]);
+    setIsDeleteModalOpen(false);
+    setIsSettingsOpen(false);
   };
 
   const executeSearch = async () => {
@@ -389,14 +426,19 @@ function App() {
       <Navbar onOpenSettings={() => setIsSettingsOpen(true)} />
       
       {isSettingsOpen && (
-        <SettingsModal currentThemeId={activeThemeId} onSelectTheme={setActiveThemeId} onClose={() => setIsSettingsOpen(false)} />
+        <SettingsModal 
+          currentThemeId={activeThemeId} 
+          onSelectTheme={setActiveThemeId} 
+          onClose={() => setIsSettingsOpen(false)} 
+          onClearData={() => setIsDeleteModalOpen(true)}
+        />
       )}
 
       {isDeleteModalOpen && (
         <div className="modal-overlay">
           <div className="modal-content">
             <h3 style={{ color: 'var(--color-error-orange)' }}>Are you sure?</h3>
-            <p>This will permanently delete all your saved weak verses. This action cannot be undone.</p>
+            <p>This will permanently delete your entire Song Library. This action cannot be undone.</p>
             <div className="modal-actions">
               <button className="secondary-button" onClick={() => setIsDeleteModalOpen(false)}>Cancel</button>
               <button className="go-button" onClick={confirmClearDatabase} style={{ backgroundColor: 'var(--color-error-orange)', color: 'var(--color-bg-dark)', borderColor: 'var(--color-error-orange)' }}>Delete Everything</button>
@@ -411,32 +453,54 @@ function App() {
         <ResultsScreen stats={finalStats} onGoHome={() => setCurrentView('home')} onRetry={() => setCurrentView('select-verses')} />
       ) : (
         <div className="container">
-          <header className="header">
-            <h2>Get started!</h2>
-          </header>
-
-          <div className="weak-lines-dashboard">
-            <h3>Your Weak Verses Database</h3>
-            <p>You have <strong>{savedWeakVerses.length}</strong> verses currently saved for review.</p>
-            <div className="results-actions">
-              <button className="go-button" onClick={handleDrillWeakVerses} disabled={savedWeakVerses.length === 0} style={{ opacity: savedWeakVerses.length === 0 ? 0.5 : 1 }}>Drill Weak Verses Now</button>
-              {savedWeakVerses.length > 0 && <button className="secondary-button" onClick={() => setIsDeleteModalOpen(true)} style={{ borderColor: 'var(--color-error-orange)', color: 'var(--color-error-orange)'}}>Clear Database</button>}
-            </div>
+          
+          <div className="library-dashboard">
+            <h3>Continue Memorizing</h3>
+            {songLibrary.length === 0 ? (
+              <p style={{ opacity: 0.6 }}>Your library is empty. Search or paste a song below to start!</p>
+            ) : (
+              <ul className="library-list">
+                {songLibrary.sort((a,b) => b.lastPracticed - a.lastPracticed).map(song => (
+                  <li key={song.id} className="library-item">
+                     <div className="library-song-info">
+                        <div>
+                          <p className="library-song-title">{song.title}</p>
+                          <p className="library-song-artist">{song.artist}</p>
+                        </div>
+                        {song.weakVerses.length > 0 && (
+                          <span className="weak-badge">{song.weakVerses.length} Weak Verses</span>
+                        )}
+                     </div>
+                     <div className="library-actions">
+                       <button className="library-btn" onClick={() => handleResumeSong(song)}>Practice Selection</button>
+                       <button 
+                         className="library-btn drill-btn" 
+                         disabled={song.weakVerses.length === 0} 
+                         onClick={() => handleDrillSongWeak(song)}
+                       >
+                         Drill Weak Verses
+                       </button>
+                     </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
-          <div className="divider"></div>
-          
-          <section className="manual-entry-section">
-            <textarea className="lyrics-textarea" placeholder="paste in your lyrics here!" value={rawLyrics} onChange={(e) => setRawLyrics(e.target.value)} />
-            <div className="button-container"><button className="go-button" onClick={() => handleProcessLyrics(rawLyrics)}>go</button></div>
-          </section>
-          
-          <div className="divider"><h3>or</h3><p>search up a song through its title and get the lyrics!</p></div>
-          
-          <section className="search-section">
+          <div 
+            className="divider" 
+            style={{ 
+              width: '100%', 
+              maxWidth: '600px', 
+              margin: '0.5rem 0'
+            }}
+          ></div>        
+
+          <section className="search-section" style={{ width: '100%', maxWidth: '600px', marginBottom: '2rem' }}>
+            <h3 style={{ textAlign: 'left', marginTop: 0, color: 'var(--color-sand)' }}>Add a New Song</h3>
             <div className="search-bar">
               <svg className="icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-              <input type="text" placeholder="Enter song title here" className="search-input" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && executeSearch()} />
+              <input type="text" placeholder="Search by song title..." className="search-input" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && executeSearch()} />
               <svg className="icon search-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" onClick={executeSearch} style={{ cursor: 'pointer' }}><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
             </div>
             <div className="search-feedback-container">
@@ -445,7 +509,7 @@ function App() {
               {searchResults.length > 0 && (
                 <ul className="search-results-list">
                   {searchResults.map((track) => (
-                    <li key={track.id} className="search-result-item" onClick={() => handleProcessLyrics(track.plainLyrics || '')}>
+                    <li key={track.id} className="search-result-item" onClick={() => handleSelectTrack(track)}>
                       <span className="track-name">{track.trackName}</span>
                       <span className="artist-name">{track.artistName}</span>
                     </li>
@@ -454,6 +518,13 @@ function App() {
               )}
             </div>
           </section>
+
+          <section className="manual-entry-section" style={{ width: '100%', maxWidth: '600px' }}>
+            <p style={{ textAlign: 'center', opacity: 0.6, margin: '1rem 0' }}>or paste raw text</p>
+            <textarea className="lyrics-textarea" placeholder="Paste custom lyrics here..." value={rawLyrics} onChange={(e) => setRawLyrics(e.target.value)} />
+            <div className="button-container" style={{ marginTop: '1rem' }}><button className="go-button" onClick={handlePastedLyrics}>Process Lyrics</button></div>
+          </section>
+          
         </div>
       )}
     </>
