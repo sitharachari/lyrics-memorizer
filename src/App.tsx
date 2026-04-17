@@ -581,7 +581,9 @@ function App() {
             )}
           </div>
           
-          <div className="divider" style={{ width: '100%', maxWidth: '600px', margin: songLibrary.length === 0 ? '1.5rem 0' : '3rem 0' }}></div>
+          {songLibrary.length > 0 && (
+            <div className="divider" style={{ width: '100%', maxWidth: '600px', margin: '0.3rem 0' }}></div>
+          )}
           
           <section className="search-section" style={{ width: '100%', maxWidth: '600px', marginBottom: '2rem' }}>
             <h3 style={{ textAlign: 'left', marginTop: 0, color: 'var(--color-sand)' }}>Add a New Song</h3>
