@@ -742,6 +742,25 @@
   color: rgba(255,255,255,0.5);
 }
 
+.delete-song-button {
+  background: transparent;
+  border: none;
+  color: var(--color-error-orange);
+  opacity: 0.4;
+  cursor: pointer;
+  padding: 0.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.delete-song-button:hover {
+  opacity: 1;
+  background-color: rgba(224, 122, 95, 0.1); /* Faint orange background on hover */
+}
+
 /* --- Test Mode Styles --- */
 .test-input {
   width: 100%;
