@@ -20,16 +20,20 @@ import TestResultsScreen from './components/TestResultsScreen';
 function App() {
   const [currentView, setCurrentView] = useState<'home' | 'select-verses' | 'practice' | 'test' | 'results' | 'test-results' | 'about'>('home');
   const [rawLyrics, setRawLyrics] = useState('');
-  
+  const [customTitle, setCustomTitle] = useState('');
+  const [customArtist, setCustomArtist] = useState('');
+
   const [songLibrary, setSongLibrary] = useState<SavedSong[]>(() => {
     const saved = localStorage.getItem('lyric-library');
     return saved ? JSON.parse(saved) : [];
   });
 
+  const [editingSongId, setEditingSongId] = useState<string | null>(null);
+  const [editingTitleValue, setEditingTitleValue] = useState('');
+
   const [activeSongMeta, setActiveSongMeta] = useState<{ id: string, title: string, artist: string, fullVerses: string[][] } | null>(null);
-  const [songVerses, setSongVerses] = useState<string[][]>([]); 
-  const [activePracticeVerses, setActivePracticeVerses] = useState<string[][]>([]); 
-  
+  const [songVerses, setSongVerses] = useState<string[][]>([]);
+  const [activePracticeVerses, setActivePracticeVerses] = useState<string[][]>([]);
   const [practiceStats, setPracticeStats] = useState<SessionStats | null>(null);
   const [testStats, setTestStats] = useState<TestStats | null>(null);
 
@@ -50,7 +54,24 @@ function App() {
       return newLibrary;
     });
     setSongToDelete(null); // Close the modal
-    setLibrarySelectedIndex(-1); // Reset keyboard focus just in case
+  };
+
+  const saveEditedSongTitle = (id: string) => {
+    if (!editingTitleValue.trim()) {
+      setEditingSongId(null);
+      return;
+    }
+    setSongLibrary(prev => {
+      const updated = prev.map(song =>
+        song.id === id ? { ...song, title: editingTitleValue.trim() } : song
+      );
+      localStorage.setItem('lyric-library', JSON.stringify(updated));
+      return updated;
+    });
+    if (activeSongMeta && activeSongMeta.id === id) {
+      setActiveSongMeta({ ...activeSongMeta, title: editingTitleValue.trim() });
+    }
+    setEditingSongId(null);
   };
 
   const [activeThemeId, setActiveThemeId] = useState<string>(() => localStorage.getItem('lyric-theme') || 'default');
@@ -62,31 +83,53 @@ function App() {
     localStorage.setItem('lyric-theme', activeThemeId);
   }, [activeThemeId]);
 
-
-  const parseLyricsToVerses = (text: string) => text.split(/\n{2,}/).map(chunk => chunk.split('\n').map(l => l.trim()).filter(l => l.length > 0)).filter(v => v.length > 0);
+  const parseLyricsToVerses = (text: string) =>
+    text
+      .split(/\n{2,}/)
+      .map(chunk => chunk.split('\n').map(l => l.trim()).filter(l => l.length > 0))
+      .filter(v => v.length > 0);
 
   const handlePastedLyrics = () => {
     const parsed = parseLyricsToVerses(rawLyrics);
     if (parsed.length === 0) return;
-    setActiveSongMeta({ id: 'custom-' + Date.now(), title: 'Custom Song', artist: 'Unknown', fullVerses: parsed });
-    setSongVerses(parsed); setCurrentView('select-verses');
+    setActiveSongMeta({
+      id: 'custom-' + Date.now(),
+      title: customTitle.trim() || 'Custom Song',
+      artist: customArtist.trim() || 'Unknown',
+      fullVerses: parsed
+    });
+    setSongVerses(parsed);
+    setCurrentView('select-verses');
+    setRawLyrics('');
+    setCustomTitle('');
+    setCustomArtist('');
   };
 
   const handleSelectTrack = (track: LrcLibTrack) => {
     if (!track.plainLyrics) return;
     const parsed = parseLyricsToVerses(track.plainLyrics);
     setActiveSongMeta({ id: track.id.toString(), title: track.trackName, artist: track.artistName, fullVerses: parsed });
-    setSongVerses(parsed); setCurrentView('select-verses');
-    setSearchQuery(''); setSearchResults([]);
+    setSongVerses(parsed);
+    setCurrentView('select-verses');
+    setSearchQuery('');
+    setSearchResults([]);
   };
 
   const handleResumeSong = (song: SavedSong) => {
     setActiveSongMeta({ id: song.id, title: song.title, artist: song.artist, fullVerses: song.fullVerses });
-    setSongVerses(song.fullVerses); setCurrentView('select-verses'); 
+    setSongVerses(song.fullVerses);
+    setCurrentView('select-verses');
   };
 
-  const handleStartPractice = (selectedVerses: string[][]) => { setActivePracticeVerses(selectedVerses); setCurrentView('practice'); };
-  const handleStartTest = (selectedVerses: string[][]) => { setActivePracticeVerses(selectedVerses); setCurrentView('test'); };
+  const handleStartPractice = (selectedVerses: string[][]) => {
+    setActivePracticeVerses(selectedVerses);
+    setCurrentView('practice');
+  };
+
+  const handleStartTest = (selectedVerses: string[][]) => {
+    setActivePracticeVerses(selectedVerses);
+    setCurrentView('test');
+  };
 
   const saveFailedVersesToLibrary = (failedVerses: string[][]) => {
     if (activeSongMeta) {
@@ -97,19 +140,33 @@ function App() {
           const existingStrings = existingSong.weakVerses.map(v => JSON.stringify(v));
           const newStrings = failedVerses.map(v => JSON.stringify(v));
           const combinedStrings = Array.from(new Set([...existingStrings, ...newStrings]));
-          
+
           const newLibrary = [...prev];
-          newLibrary[existingSongIndex] = { ...existingSong, weakVerses: combinedStrings.map(s => JSON.parse(s)), lastPracticed: Date.now() };
+          newLibrary[existingSongIndex] = {
+            ...existingSong,
+            weakVerses: combinedStrings.map(s => JSON.parse(s)),
+            lastPracticed: Date.now()
+          };
           localStorage.setItem('lyric-library', JSON.stringify(newLibrary));
           return newLibrary;
         } else {
-          const newLibrary = [{ id: activeSongMeta.id, title: activeSongMeta.title, artist: activeSongMeta.artist, fullVerses: activeSongMeta.fullVerses, weakVerses: failedVerses, lastPracticed: Date.now() }, ...prev];
+          const newLibrary = [
+            {
+              id: activeSongMeta.id,
+              title: activeSongMeta.title,
+              artist: activeSongMeta.artist,
+              fullVerses: activeSongMeta.fullVerses,
+              weakVerses: failedVerses,
+              lastPracticed: Date.now()
+            },
+            ...prev
+          ];
           localStorage.setItem('lyric-library', JSON.stringify(newLibrary));
           return newLibrary;
         }
       });
     }
-  }
+  };
 
   const handlePracticeComplete = (stats: SessionStats) => {
     setPracticeStats(stats);
@@ -123,18 +180,29 @@ function App() {
     setCurrentView('test-results');
   };
 
-  const confirmClearDatabase = () => { localStorage.removeItem('lyric-library'); setSongLibrary([]); setIsDeleteModalOpen(false); setIsSettingsOpen(false); };
+  const confirmClearDatabase = () => {
+    localStorage.removeItem('lyric-library');
+    setSongLibrary([]);
+    setIsDeleteModalOpen(false);
+    setIsSettingsOpen(false);
+  };
 
   const executeSearch = async () => {
     if (!searchQuery.trim()) return;
-    setIsSearching(true); setSearchError(''); setSearchResults([]);
+    setIsSearching(true);
+    setSearchError('');
+    setSearchResults([]);
     try {
       const response = await fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(searchQuery)}`);
       if (!response.ok) throw new Error('Failed to fetch');
       const data: LrcLibTrack[] = await response.json();
       const validTracks = data.filter(track => !track.instrumental && track.plainLyrics);
       validTracks.length === 0 ? setSearchError('No lyrics found.') : setSearchResults(validTracks.slice(0, 5));
-    } catch { setSearchError('Network error. Please try again.'); } finally { setIsSearching(false); }
+    } catch {
+      setSearchError('Network error. Please try again.');
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   // --- RENDERING ROUTER ---
@@ -145,7 +213,7 @@ function App() {
     <>
       <Navbar onOpenSettings={() => setIsSettingsOpen(true)} onOpenAbout={() => setCurrentView('about')} />
       {isSettingsOpen && <SettingsModal currentThemeId={activeThemeId} onSelectTheme={setActiveThemeId} onClose={() => setIsSettingsOpen(false)} onClearData={() => setIsDeleteModalOpen(true)} />}
-      
+
       {isDeleteModalOpen && (
         <div className="modal-overlay">
           <div className="modal-content">
@@ -188,41 +256,69 @@ function App() {
               <p style={{ opacity: 0.6 }}>Your library is empty. Search or paste a song below to start!</p>
             ) : (
               <ul className="library-list">
-                {songLibrary.sort((a,b) => b.lastPracticed - a.lastPracticed).map(song => (
+                {songLibrary.sort((a, b) => b.lastPracticed - a.lastPracticed).map(song => (
                   <li key={song.id} className="library-item">
-                     <div className="library-song-info">
-                        <div>
-                          <p className="library-song-title">{song.title}</p>
-                          <p className="library-song-artist">{song.artist}</p>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                          {song.weakVerses.length > 0 && <span className="weak-badge">{song.weakVerses.length} Weak Verses</span>}
-                          <button 
-                            className="delete-song-button" 
-                            onClick={(e) => {
-                              e.stopPropagation(); // Stop the click from accidentally selecting the song
-                              setSongToDelete(song);
+                    <div className="library-song-info">
+                      <div>
+                        {editingSongId === song.id ? (
+                          <input
+                            type="text"
+                            className="edit-title-input"
+                            value={editingTitleValue}
+                            onChange={(e) => setEditingTitleValue(e.target.value)}
+                            onBlur={() => saveEditedSongTitle(song.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') saveEditedSongTitle(song.id);
+                              if (e.key === 'Escape') setEditingSongId(null);
                             }}
-                            title="Delete this song"
-                          >
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="3 6 5 6 21 6"></polyline>
-                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                            </svg>
-                          </button>
-                        </div>
-                     </div>
-                     <div className="library-actions"><button className="library-btn" onClick={() => handleResumeSong(song)}>Open Song Details</button></div>
+                            autoFocus
+                          />
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <p className="library-song-title">{song.title}</p>
+                            <button
+                              className="edit-song-button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingSongId(song.id);
+                                setEditingTitleValue(song.title);
+                              }}
+                              title="Edit song title"
+                            >
+                              ✎
+                            </button>
+                          </div>
+                        )}
+                        <p className="library-song-artist">{song.artist}</p>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                        {song.weakVerses.length > 0 && <span className="weak-badge">{song.weakVerses.length} Weak Verses</span>}
+                        <button
+                          className="delete-song-button"
+                          onClick={(e) => {
+                            e.stopPropagation(); // Stop the click from accidentally selecting the song
+                            setSongToDelete(song);
+                          }}
+                          title="Delete this song"
+                        >
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                    <div className="library-actions"><button className="library-btn" onClick={() => handleResumeSong(song)}>Open Song Details</button></div>
                   </li>
                 ))}
               </ul>
             )}
           </div>
-          
+
           {songLibrary.length > 0 && (
             <div className="divider" style={{ width: '100%', maxWidth: '600px', margin: '0.3rem 0' }}></div>
           )}
-          
+
           <section className="search-section" style={{ width: '100%', maxWidth: '600px', marginBottom: '2rem' }}>
             <h3 style={{ textAlign: 'left', marginTop: 0, color: 'var(--color-sand)' }}>Add a New Song</h3>
             <div className="search-bar">
@@ -246,7 +342,23 @@ function App() {
           </section>
 
           <section className="manual-entry-section" style={{ width: '100%', maxWidth: '600px' }}>
-            <p style={{ textAlign: 'center', opacity: 0.6, margin: '1rem 0' }}>or paste raw text</p>
+            <p style={{ textAlign: 'center', opacity: 0.6, margin: '1rem 0', width: '100%' }}>or paste raw text</p>
+            <div className="custom-meta-inputs">
+              <input
+                type="text"
+                placeholder="Custom Song Title (optional)..."
+                className="custom-meta-input"
+                value={customTitle}
+                onChange={(e) => setCustomTitle(e.target.value)}
+              />
+              <input
+                type="text"
+                placeholder="Artist (optional)..."
+                className="custom-meta-input"
+                value={customArtist}
+                onChange={(e) => setCustomArtist(e.target.value)}
+              />
+            </div>
             <textarea className="lyrics-textarea" placeholder="Paste custom lyrics here..." value={rawLyrics} onChange={(e) => setRawLyrics(e.target.value)} />
             <div className="button-container" style={{ marginTop: '1rem' }}><button className="go-button" onClick={handlePastedLyrics}>Process Lyrics</button></div>
           </section>

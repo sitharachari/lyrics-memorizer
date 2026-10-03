@@ -6,10 +6,10 @@ export default function AboutScreen({ onGoHome }: { onGoHome: () => void }) {
         <h2 className="results-header" style={{ textAlign: 'left', marginTop: '1rem', color: 'var(--color-neon-green)' }}>About</h2>
         <div style={{ color: 'var(--color-sand)', fontSize: '1.2rem', lineHeight: '1.6' }}>
           <p>
-            I created this app because I tend to hyper fixate on a song and I want to memorize it to be able to sing it as fast as I can.
+            I created this app because I get random bursts of having to memorize a certain song completely. Usually, I just write it out until it's in my head, but since I also love practicing my typing, I thought to mix the two and make an app catered towards memorizing lyrics this way.
           </p>
           <p>
-            I also love typing tests and practicing typing, so this app is a specialized mix of both!
+            Since I occasionally also want to memorize anything else, there is a feature to paste in any passage you want and memorize that too!
           </p>
         </div>
       </div>

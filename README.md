@@ -1,73 +1,25 @@
-# React + TypeScript + Vite
+# Lyric Memorizer
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+An interactive typing and memorization web application built with React and TypeScript.
 
-Currently, two official plugins are available:
+## Why I Built This
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+I created this app because I get random bursts of having to memorize a certain song completely. Usually, I just write the lyrics out over and over until they're in my head—but since I also love practicing my typing, I thought to mix the two and make an app catered towards memorizing lyrics this way. 
 
-## React Compiler
+Since I occasionally also want to memorize anything else, there is a feature to paste in any passage you want and memorize that too.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Features
 
-## Expanding the ESLint configuration
+- **Song Search (LRCLIB Integration):** Search and pull plain lyrics directly from the LRCLIB API.
+- **Custom Passage Entry:** Paste any custom lyrics, poem, speech, or passage with custom titles and artist/author tags.
+- **Verse Selection:** Choose to practice the entire text at once or isolate specific verses/paragraphs.
+- **Practice Mode (Guided):** Real-time typing test with a live caret, WPM and accuracy tracking, and customizable modifiers (*Force Lowercase*, *No Punctuation*, and *First-Letter Mode* to mask word bodies while leaving first-letter cues).
+- **Test Mode (Blind):** Type lines completely from memory with optional hints and Levenshtein distance grading that distinguishes between minor typos and actual memory errors.
+- **Weak Verse Tracking:** Automatically saves songs and tracks verses where you struggled in `localStorage` so you can jump right back into drilling them later.
+- **Custom Color Themes:** Choose from 6 built-in color palettes (*Pine & Sand*, *Aqua Turquoise*, *Cherry Frost*, *Caramel Sunset*, *Indigo Velvet*, and *Night Bordeaux*).
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Getting Started
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+1. **Install dependencies:**
+   ```bash
+   npm install
