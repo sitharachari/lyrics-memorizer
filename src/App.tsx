@@ -1,121 +1,371 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+// src/App.tsx
+import { useState, useEffect } from 'react';
+import './App.css';
 
+// 1. Import Types & Constants
+import type { SessionStats, TestStats, LrcLibTrack, SavedSong } from './types';
+import { THEMES } from './constants/themes';
+
+// 2. Import Components
+import Navbar from './components/Navbar';
+import SettingsModal from './components/SettingsModal';
+import AboutScreen from './components/AboutScreen';
+import PracticeSession from './components/PracticeSession';
+import TestSession from './components/TestSession';
+import VerseSelectionScreen from './components/VerseSelectionScreen';
+import ResultsScreen from './components/ResultsScreen';
+import TestResultsScreen from './components/TestResultsScreen';
+
+// --- MAIN APP COMPONENT ---
 function App() {
-  const [count, setCount] = useState(0)
+  const [currentView, setCurrentView] = useState<'home' | 'select-verses' | 'practice' | 'test' | 'results' | 'test-results' | 'about'>('home');
+  const [rawLyrics, setRawLyrics] = useState('');
+  const [customTitle, setCustomTitle] = useState('');
+  const [customArtist, setCustomArtist] = useState('');
+
+  const [songLibrary, setSongLibrary] = useState<SavedSong[]>(() => {
+    const saved = localStorage.getItem('lyric-library');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [editingSongId, setEditingSongId] = useState<string | null>(null);
+  const [editingTitleValue, setEditingTitleValue] = useState('');
+
+  const [activeSongMeta, setActiveSongMeta] = useState<{ id: string, title: string, artist: string, fullVerses: string[][] } | null>(null);
+  const [songVerses, setSongVerses] = useState<string[][]>([]);
+  const [activePracticeVerses, setActivePracticeVerses] = useState<string[][]>([]);
+  const [practiceStats, setPracticeStats] = useState<SessionStats | null>(null);
+  const [testStats, setTestStats] = useState<TestStats | null>(null);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<LrcLibTrack[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState('');
+
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [songToDelete, setSongToDelete] = useState<SavedSong | null>(null);
+
+  const confirmDeleteSingleSong = () => {
+    if (!songToDelete) return;
+    setSongLibrary(prev => {
+      const newLibrary = prev.filter(song => song.id !== songToDelete.id);
+      localStorage.setItem('lyric-library', JSON.stringify(newLibrary));
+      return newLibrary;
+    });
+    setSongToDelete(null); // Close the modal
+  };
+
+  const saveEditedSongTitle = (id: string) => {
+    if (!editingTitleValue.trim()) {
+      setEditingSongId(null);
+      return;
+    }
+    setSongLibrary(prev => {
+      const updated = prev.map(song =>
+        song.id === id ? { ...song, title: editingTitleValue.trim() } : song
+      );
+      localStorage.setItem('lyric-library', JSON.stringify(updated));
+      return updated;
+    });
+    if (activeSongMeta && activeSongMeta.id === id) {
+      setActiveSongMeta({ ...activeSongMeta, title: editingTitleValue.trim() });
+    }
+    setEditingSongId(null);
+  };
+
+  const [activeThemeId, setActiveThemeId] = useState<string>(() => localStorage.getItem('lyric-theme') || 'default');
+
+  useEffect(() => {
+    const theme = THEMES.find(t => t.id === activeThemeId) || THEMES[0];
+    const root = document.documentElement;
+    Object.entries(theme.colors).forEach(([property, value]) => root.style.setProperty(property, value));
+    localStorage.setItem('lyric-theme', activeThemeId);
+  }, [activeThemeId]);
+
+  const parseLyricsToVerses = (text: string) =>
+    text
+      .split(/\n{2,}/)
+      .map(chunk => chunk.split('\n').map(l => l.trim()).filter(l => l.length > 0))
+      .filter(v => v.length > 0);
+
+  const handlePastedLyrics = () => {
+    const parsed = parseLyricsToVerses(rawLyrics);
+    if (parsed.length === 0) return;
+    setActiveSongMeta({
+      id: 'custom-' + Date.now(),
+      title: customTitle.trim() || 'Custom Song',
+      artist: customArtist.trim() || 'Unknown',
+      fullVerses: parsed
+    });
+    setSongVerses(parsed);
+    setCurrentView('select-verses');
+    setRawLyrics('');
+    setCustomTitle('');
+    setCustomArtist('');
+  };
+
+  const handleSelectTrack = (track: LrcLibTrack) => {
+    if (!track.plainLyrics) return;
+    const parsed = parseLyricsToVerses(track.plainLyrics);
+    setActiveSongMeta({ id: track.id.toString(), title: track.trackName, artist: track.artistName, fullVerses: parsed });
+    setSongVerses(parsed);
+    setCurrentView('select-verses');
+    setSearchQuery('');
+    setSearchResults([]);
+  };
+
+  const handleResumeSong = (song: SavedSong) => {
+    setActiveSongMeta({ id: song.id, title: song.title, artist: song.artist, fullVerses: song.fullVerses });
+    setSongVerses(song.fullVerses);
+    setCurrentView('select-verses');
+  };
+
+  const handleStartPractice = (selectedVerses: string[][]) => {
+    setActivePracticeVerses(selectedVerses);
+    setCurrentView('practice');
+  };
+
+  const handleStartTest = (selectedVerses: string[][]) => {
+    setActivePracticeVerses(selectedVerses);
+    setCurrentView('test');
+  };
+
+  const saveFailedVersesToLibrary = (failedVerses: string[][]) => {
+    if (activeSongMeta) {
+      setSongLibrary(prev => {
+        const existingSongIndex = prev.findIndex(s => s.id === activeSongMeta.id);
+        if (existingSongIndex >= 0) {
+          const existingSong = prev[existingSongIndex];
+          const existingStrings = existingSong.weakVerses.map(v => JSON.stringify(v));
+          const newStrings = failedVerses.map(v => JSON.stringify(v));
+          const combinedStrings = Array.from(new Set([...existingStrings, ...newStrings]));
+
+          const newLibrary = [...prev];
+          newLibrary[existingSongIndex] = {
+            ...existingSong,
+            weakVerses: combinedStrings.map(s => JSON.parse(s)),
+            lastPracticed: Date.now()
+          };
+          localStorage.setItem('lyric-library', JSON.stringify(newLibrary));
+          return newLibrary;
+        } else {
+          const newLibrary = [
+            {
+              id: activeSongMeta.id,
+              title: activeSongMeta.title,
+              artist: activeSongMeta.artist,
+              fullVerses: activeSongMeta.fullVerses,
+              weakVerses: failedVerses,
+              lastPracticed: Date.now()
+            },
+            ...prev
+          ];
+          localStorage.setItem('lyric-library', JSON.stringify(newLibrary));
+          return newLibrary;
+        }
+      });
+    }
+  };
+
+  const handlePracticeComplete = (stats: SessionStats) => {
+    setPracticeStats(stats);
+    saveFailedVersesToLibrary(stats.failedVerses);
+    setCurrentView('results');
+  };
+
+  const handleTestComplete = (stats: TestStats) => {
+    setTestStats(stats);
+    saveFailedVersesToLibrary(stats.failedVerses);
+    setCurrentView('test-results');
+  };
+
+  const confirmClearDatabase = () => {
+    localStorage.removeItem('lyric-library');
+    setSongLibrary([]);
+    setIsDeleteModalOpen(false);
+    setIsSettingsOpen(false);
+  };
+
+  const executeSearch = async () => {
+    if (!searchQuery.trim()) return;
+    setIsSearching(true);
+    setSearchError('');
+    setSearchResults([]);
+    try {
+      const response = await fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(searchQuery)}`);
+      if (!response.ok) throw new Error('Failed to fetch');
+      const data: LrcLibTrack[] = await response.json();
+      const validTracks = data.filter(track => !track.instrumental && track.plainLyrics);
+      validTracks.length === 0 ? setSearchError('No lyrics found.') : setSearchResults(validTracks.slice(0, 5));
+    } catch {
+      setSearchError('Network error. Please try again.');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // --- RENDERING ROUTER ---
+  if (currentView === 'practice') return <PracticeSession verses={activePracticeVerses} onExit={() => setCurrentView('home')} onComplete={handlePracticeComplete} />;
+  if (currentView === 'test') return <TestSession verses={activePracticeVerses} onExit={() => setCurrentView('home')} onComplete={handleTestComplete} />;
 
   return (
     <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+      <Navbar onOpenSettings={() => setIsSettingsOpen(true)} onOpenAbout={() => setCurrentView('about')} />
+      {isSettingsOpen && <SettingsModal currentThemeId={activeThemeId} onSelectTheme={setActiveThemeId} onClose={() => setIsSettingsOpen(false)} onClearData={() => setIsDeleteModalOpen(true)} />}
 
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
+      {isDeleteModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3 style={{ color: 'var(--color-error-orange)' }}>Are you sure?</h3>
+            <p>This will permanently delete your entire Song Library.</p>
+            <div className="modal-actions">
+              <button className="secondary-button" onClick={() => setIsDeleteModalOpen(false)}>Cancel</button>
+              <button className="go-button" onClick={confirmClearDatabase} style={{ backgroundColor: 'var(--color-error-orange)', color: 'var(--color-bg-dark)', borderColor: 'var(--color-error-orange)' }}>Delete Everything</button>
+            </div>
+          </div>
         </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      )}
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
+      {songToDelete && (
+        <div className="modal-overlay" onClick={() => setSongToDelete(null)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <h3 style={{ color: 'var(--color-error-orange)' }}>Delete Song?</h3>
+            <p>Are you sure you want to remove <strong>{songToDelete.title}</strong>? This will permanently delete your weak verses for this song.</p>
+            <div className="modal-actions">
+              <button className="secondary-button" onClick={() => setSongToDelete(null)}>Cancel</button>
+              <button className="go-button" onClick={confirmDeleteSingleSong} style={{ backgroundColor: 'var(--color-error-orange)', color: 'var(--color-bg-dark)', borderColor: 'var(--color-error-orange)' }}>Remove</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {currentView === 'about' ? (
+        <AboutScreen onGoHome={() => setCurrentView('home')} />
+      ) : currentView === 'select-verses' ? (
+        <VerseSelectionScreen verses={songVerses} onStartPractice={handleStartPractice} onStartTest={handleStartTest} onCancel={() => setCurrentView('home')} />
+      ) : currentView === 'results' && practiceStats ? (
+        <ResultsScreen stats={practiceStats} onGoHome={() => setCurrentView('home')} onRetry={() => setCurrentView('select-verses')} />
+      ) : currentView === 'test-results' && testStats ? (
+        <TestResultsScreen stats={testStats} onGoHome={() => setCurrentView('home')} onRetry={() => setCurrentView('select-verses')} />
+      ) : (
+        <div className="container">
+          <div className="library-dashboard">
+            <h3>Continue Memorizing</h3>
+            {songLibrary.length === 0 ? (
+              <p style={{ opacity: 0.6 }}>Your library is empty. Search or paste a song below to start!</p>
+            ) : (
+              <ul className="library-list">
+                {songLibrary.sort((a, b) => b.lastPracticed - a.lastPracticed).map(song => (
+                  <li key={song.id} className="library-item">
+                    <div className="library-song-info">
+                      <div>
+                        {editingSongId === song.id ? (
+                          <input
+                            type="text"
+                            className="edit-title-input"
+                            value={editingTitleValue}
+                            onChange={(e) => setEditingTitleValue(e.target.value)}
+                            onBlur={() => saveEditedSongTitle(song.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') saveEditedSongTitle(song.id);
+                              if (e.key === 'Escape') setEditingSongId(null);
+                            }}
+                            autoFocus
+                          />
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <p className="library-song-title">{song.title}</p>
+                            <button
+                              className="edit-song-button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingSongId(song.id);
+                                setEditingTitleValue(song.title);
+                              }}
+                              title="Edit song title"
+                            >
+                              ✎
+                            </button>
+                          </div>
+                        )}
+                        <p className="library-song-artist">{song.artist}</p>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                        {song.weakVerses.length > 0 && <span className="weak-badge">{song.weakVerses.length} Weak Verses</span>}
+                        <button
+                          className="delete-song-button"
+                          onClick={(e) => {
+                            e.stopPropagation(); // Stop the click from accidentally selecting the song
+                            setSongToDelete(song);
+                          }}
+                          title="Delete this song"
+                        >
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                    <div className="library-actions"><button className="library-btn" onClick={() => handleResumeSong(song)}>Open Song Details</button></div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {songLibrary.length > 0 && (
+            <div className="divider" style={{ width: '100%', maxWidth: '600px', margin: '0.3rem 0' }}></div>
+          )}
+
+          <section className="search-section" style={{ width: '100%', maxWidth: '600px', marginBottom: '2rem' }}>
+            <h3 style={{ textAlign: 'left', marginTop: 0, color: 'var(--color-sand)' }}>Add a New Song</h3>
+            <div className="search-bar">
+              <svg className="icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+              <input type="text" placeholder="Search by song title..." className="search-input" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && executeSearch()} />
+            </div>
+            <div className="search-feedback-container">
+              {isSearching && <p className="status-text">Searching LRCLIB...</p>}
+              {searchError && <p className="error-text">{searchError}</p>}
+              {searchResults.length > 0 && (
+                <ul className="search-results-list">
+                  {searchResults.map((track) => (
+                    <li key={track.id} className="search-result-item" onClick={() => handleSelectTrack(track)}>
+                      <span className="track-name">{track.trackName}</span>
+                      <span className="artist-name">{track.artistName}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </section>
+
+          <section className="manual-entry-section" style={{ width: '100%', maxWidth: '600px' }}>
+            <p style={{ textAlign: 'center', opacity: 0.6, margin: '1rem 0', width: '100%' }}>or paste raw text</p>
+            <div className="custom-meta-inputs">
+              <input
+                type="text"
+                placeholder="Custom Song Title (optional)..."
+                className="custom-meta-input"
+                value={customTitle}
+                onChange={(e) => setCustomTitle(e.target.value)}
+              />
+              <input
+                type="text"
+                placeholder="Artist (optional)..."
+                className="custom-meta-input"
+                value={customArtist}
+                onChange={(e) => setCustomArtist(e.target.value)}
+              />
+            </div>
+            <textarea className="lyrics-textarea" placeholder="Paste custom lyrics here..." value={rawLyrics} onChange={(e) => setRawLyrics(e.target.value)} />
+            <div className="button-container" style={{ marginTop: '1rem' }}><button className="go-button" onClick={handlePastedLyrics}>Process Lyrics</button></div>
+          </section>
+        </div>
+      )}
     </>
-  )
+  );
 }
 
-export default App
+export default App;
